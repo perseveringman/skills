@@ -53,12 +53,12 @@ export default function App({ useStore }: Props) {
             <GraphOverlay useStore={useStore} isMobile={isMobile} />
           </div>
         )}
+        {isMobile && <MobileTabs useStore={useStore} />}
       </div>
 
       <Timeline useStore={useStore} isMobile={isMobile} />
       <DetailDrawer useStore={useStore} isMobile={isMobile} />
       {!isMobile && <Legend useStore={useStore} />}
-      {isMobile && <MobileTabs useStore={useStore} />}
     </div>
   );
 }

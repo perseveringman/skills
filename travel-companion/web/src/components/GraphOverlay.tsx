@@ -161,9 +161,20 @@ export default function GraphOverlay({ useStore, isMobile }:
     cy.nodes().removeClass("selected");
     if (selectedId) {
       const n = cy.getElementById(selectedId);
-      if (n.length) { n.addClass("selected"); cy.center(n); }
+      if (n.length) {
+        n.addClass("selected");
+        cy.center(n);
+        // On mobile, the bottom drawer (55vh) covers the lower portion of the
+        // graph canvas.  Shift the viewport up so the selected node sits in the
+        // centre of the *visible* area above the drawer rather than the
+        // geometric centre of the full canvas.
+        if (isMobile) {
+          const drawerH = window.innerHeight * 0.55; // matches CSS: height 55vh
+          cy.panBy({ x: 0, y: -drawerH / 2 });
+        }
+      }
     }
-  }, [selectedId]);
+  }, [selectedId, isMobile]);
 
   // Resize + re-fit when the container resizes. If the graph was laid out
   // while the container was tiny, we also nudge fcose again once we have

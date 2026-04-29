@@ -241,6 +241,25 @@ a:hover { text-decoration: underline; }
 .drawer .md-body code { background: #eceae2; padding: 1px 4px; border-radius: 3px; font-size: 12px; }
 .drawer .coord { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12px; color: var(--muted); margin-top: 4px; }
+.drawer .entity-hero {
+  flex: 0 0 auto;
+  position: relative;
+  width: 100%;
+  height: 180px;
+  overflow: hidden;
+  background: var(--panel-2);
+}
+.drawer .entity-hero img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.drawer .hero-credit {
+  position: absolute; bottom: 4px; right: 6px;
+  font-size: 10px; color: rgba(255,255,255,.8);
+  background: rgba(0,0,0,.35); padding: 1px 6px;
+  border-radius: 4px; pointer-events: none;
+}
 .drawer .chat-turn {
   padding: 8px 10px;
   border-radius: 8px;

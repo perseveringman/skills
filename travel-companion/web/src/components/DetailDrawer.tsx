@@ -80,6 +80,14 @@ export default function DetailDrawer({ useStore, isMobile }:
   return (
     <aside className={klass} aria-hidden={!entity}>
       {isMobile && <div ref={grabberRef} className="grabber" />}
+      {entity?.image && (
+        <div className="entity-hero">
+          <img src={entity.image} alt={entity.id} loading="lazy" />
+          {entity.imageCredit && (
+            <span className="hero-credit">{entity.imageCredit}</span>
+          )}
+        </div>
+      )}
       <div className="head">
         <div style={{ flex: 1 }}>
           {entity && (

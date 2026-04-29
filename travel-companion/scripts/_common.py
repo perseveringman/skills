@@ -29,6 +29,7 @@ def trip_paths(trip_root: str | os.PathLike) -> dict[str, Path]:
         "log": root / ".trip" / "session-log.jsonl",
         "state": root / ".trip" / "state.json",
         "geocache": root / ".trip" / "geocache.json",
+        "imagecache": root / ".trip" / "imagecache.json",
         "wiki": root / "wiki",
         "entities": root / "wiki" / "entities",
         "index": root / "wiki" / "index.md",
@@ -68,6 +69,8 @@ def ensure_tree(trip_root: str | os.PathLike) -> dict[str, Path]:
         })
     if not p["geocache"].exists():
         write_json(p["geocache"], {})
+    if not p["imagecache"].exists():
+        write_json(p["imagecache"], {})
     return p
 
 

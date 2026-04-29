@@ -18,6 +18,12 @@ export interface Entity {
   body: string;
   /** Relative path in the trip root — shown in the drawer for reference. */
   file: string;
+  /** Representative image URL (fetched from Unsplash). */
+  image: string | null;
+  /** Attribution string, e.g. "John Doe / Unsplash". */
+  imageCredit: string | null;
+  /** Source service, e.g. "unsplash". */
+  imageSource: string | null;
 }
 
 export interface TripEvent {

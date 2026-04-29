@@ -39,6 +39,9 @@ def _camel(entity_fm: dict, body: str, file: str) -> dict:
         "mentionedAt": list(entity_fm.get("mentioned_at") or []),
         "body": body or "",
         "file": file,
+        "image": entity_fm.get("image"),
+        "imageCredit": entity_fm.get("image_credit"),
+        "imageSource": entity_fm.get("image_source"),
     }
 
 

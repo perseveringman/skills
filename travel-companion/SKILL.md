@@ -65,7 +65,7 @@ for the current destination (`pharaoh`, `dynasty`, `temple`, `ryokan`,
 
 After you finish replying to the user in a trip conversation, run this exact
 sequence. Steps 1–4 are scripted (deterministic). Step 3 (extraction) and
-step 5 (recommendations) require LLM reasoning — read
+step 6 (recommendations) require LLM reasoning — read
 `references/extraction-prompts.md` for the prompts to use.
 
 ```
@@ -73,9 +73,10 @@ step 5 (recommendations) require LLM reasoning — read
 2. extract          → LLM, using extraction-prompts.md
 3. upsert_entities  → scripts/ingest.py upsert      (write/merge wiki md)
 4. geocode          → scripts/geocode.py            (Nominatim for new places)
-5. recommend        → LLM, per new place, 4 categories
-6. rebuild_graph    → scripts/rebuild_graph.py      (scan frontmatter)
-7. render           → scripts/render.py             (inject data into HTML)
+5. fetch_images     → scripts/fetch_images.py       (Unsplash for entities)
+6. recommend        → LLM, per new place, 4 categories
+7. rebuild_graph    → scripts/rebuild_graph.py      (scan frontmatter)
+8. render           → scripts/render.py             (inject data into HTML)
 ```
 
 **Working directory convention:** the trip root is the agent's current
@@ -148,7 +149,22 @@ Finds every entity whose `type` implies a location (`place`, `temple`,
 null, then queries Nominatim. Results are cached in `.trip/geocache.json`.
 Respects the Nominatim 1 req/s policy and sends a proper `User-Agent`.
 
-### Step 5 — recommendations (LLM reasoning)
+### Step 5 — fetch_images
+
+```bash
+python scripts/fetch_images.py --trip-root .
+```
+
+Searches Unsplash for a representative landscape photo for every entity that
+doesn’t have an `image` field yet. Uses the entity’s first English alias
+(or falls back to id + type) as the search query. Writes `image`,
+`image_credit` and `image_source` into the entity’s YAML frontmatter.
+Results are cached in `.trip/imagecache.json`.
+
+Requires the `UNSPLASH_ACCESS_KEY` environment variable (free tier: 50
+requests/hour). Respects a 1 req/s rate limit.
+
+### Step 6 — recommendations (LLM reasoning)
 
 For every **newly discovered place** in this turn (use the script's stdout
 `new_places` list), read `references/extraction-prompts.md` →
@@ -163,7 +179,7 @@ Use the exact templates in `references/extraction-prompts.md` so the files
 stay consistent across runs. If the user later pushes back
 (*"拍摄推荐不够细"*), regenerate only the relevant file — don't touch others.
 
-### Step 6 — export data
+### Step 7 — export data
 
 ```bash
 python scripts/export_data.py --trip-root .
@@ -175,7 +191,7 @@ aggregated `data/trip.json`. Auto-fills `anchors` for any entity where
 the LLM forgot (geo entities anchor to themselves; non-geo entities derive
 anchors from their `related` entries whose type is a place).
 
-### Step 7 — inject
+### Step 8 — inject
 
 ```bash
 python scripts/inject.py --trip-root .

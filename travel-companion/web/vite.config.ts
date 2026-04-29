@@ -4,18 +4,25 @@ import { viteSingleFile } from "vite-plugin-singlefile";
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 
-// In `npm run dev` we inject a fixture trip.json into the __TRIP_DATA__
-// placeholder so the explorer is fully populated without needing the
-// inject.py pipeline. Default fixture is the Egypt south route. Override
-// via the FIXTURE env var: `FIXTURE=other-route npm run dev`.
+// Inject fixture trip.json into the __TRIP_DATA__ placeholder so the
+// explorer is fully populated without needing the inject.py pipeline.
+// Default fixture is the Egypt south route. Override via the FIXTURE env
+// var: `FIXTURE=other-route npm run dev`.
 //
-// In `npm run build` this plugin is a no-op — the placeholder is left as
-// `null` so the upstream Python pipeline (scripts/inject.py) can swap in
-// real trip data at deploy time.
-function devFixturePlugin(): Plugin {
+// Active in:
+//   - `npm run dev` (always)
+//   - any build where INJECT_FIXTURE=1 (e.g. Vercel preview builds)
+//
+// Plain `npm run build` leaves the placeholder as `null` so the upstream
+// Python pipeline (scripts/inject.py) can swap in real trip data at
+// deploy time.
+function fixtureInjectPlugin(): Plugin {
+  const enabledForBuild = process.env.INJECT_FIXTURE === "1";
   return {
-    name: "travel-companion-dev-fixture",
-    apply: "serve",
+    name: "travel-companion-fixture-inject",
+    apply(_config, env) {
+      return env.command === "serve" || enabledForBuild;
+    },
     transformIndexHtml(html) {
       const fixtureName = process.env.FIXTURE || "egypt-south";
       const fixturePath = resolve(
@@ -48,15 +55,21 @@ function devFixturePlugin(): Plugin {
 // Build a single self-contained HTML. All JS/CSS is inlined.
 // Leaflet CSS is loaded from CDN via <link> in index.html — this lets us keep
 // the bundle small; the tile layer already needs a network hit anyway.
+//
+// Two output targets:
+//   - default (`npm run build`)        → ../assets/explorer.html
+//   - preview (`npm run build:preview`) → ./dist/index.html (used by Vercel)
+const isPreviewBuild = process.env.BUILD_TARGET === "preview";
+
 export default defineConfig({
-  plugins: [react(), devFixturePlugin(), viteSingleFile()],
+  plugins: [react(), fixtureInjectPlugin(), viteSingleFile()],
   build: {
     target: "es2020",
     cssCodeSplit: false,
     assetsInlineLimit: 100_000_000,
     chunkSizeWarningLimit: 5000,
     rollupOptions: { output: { inlineDynamicImports: true } },
-    outDir: "../assets",
-    emptyOutDir: false,
+    outDir: isPreviewBuild ? "dist" : "../assets",
+    emptyOutDir: isPreviewBuild,
   },
 });

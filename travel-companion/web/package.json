@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build"
+    "build": "tsc --noEmit && vite build",
+    "build:preview": "tsc --noEmit && BUILD_TARGET=preview INJECT_FIXTURE=1 vite build"
   },
   "dependencies": {
     "@rollup/wasm-node": "^4.60.2",

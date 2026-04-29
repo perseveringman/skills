@@ -40,9 +40,28 @@ with the `FIXTURE` env var:
 FIXTURE=other-route npm run dev
 ```
 
-The plugin is `apply: "serve"` only — `npm run build` leaves
+The plugin runs in `dev` and in builds where `INJECT_FIXTURE=1` is set
+(see Vercel section below). Plain `npm run build` leaves
 `__TRIP_DATA__` as `null`, so the upstream `scripts/inject.py` pipeline
 keeps full control of the production single-file output.
+
+## Vercel preview deploy
+
+A `vercel.json` at the repo root wires up auto-deploy on every push:
+
+- Build command: `cd travel-companion/web && npm install && npm run build:preview`
+- Output dir: `travel-companion/web/dist`
+
+`build:preview` differs from `build` in two ways:
+
+1. Sets `INJECT_FIXTURE=1` so the fixture plugin also runs at build time
+   — the deployed HTML loads with the Egypt south fixture pre-populated.
+2. Sets `BUILD_TARGET=preview` so vite writes to `web/dist/index.html`
+   instead of `../assets/explorer.html`. This keeps the production
+   single-file artifact (consumed by `inject.py`) untouched.
+
+To swap fixtures on the deploy, set the `FIXTURE` env var in the Vercel
+project settings (e.g. `FIXTURE=other-route`).
 
 If a fixture has no `data/trip.json` yet, regenerate it:
 

@@ -1,0 +1,10 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "cd travel-companion/web && npm install && npm run build:preview",
+  "outputDirectory": "travel-companion/web/dist",
+  "installCommand": "echo 'install handled in buildCommand'",
+  "framework": null,
+  "github": {
+    "silent": true
+  }
+}

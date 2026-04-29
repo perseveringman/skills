@@ -10,11 +10,20 @@ export default function Topbar({ useStore, isMobile }:
   const hits = useMemo(() => {
     if (!q.trim()) return [];
     const ql = q.trim().toLowerCase();
-    return data.entities.filter((e) =>
-      e.id.toLowerCase().includes(ql) ||
-      e.aliases.some((a) => a.toLowerCase().includes(ql)) ||
-      e.tags.some((t) => t.toLowerCase().includes(ql))
-    ).slice(0, 8);
+    return data.entities
+      .map((e) => {
+        // Match against id (Chinese), aliases (English/Chinese), tags, type, summary
+        const matchedAlias = e.aliases.find((a) => a.toLowerCase().includes(ql));
+        const matched =
+          e.id.toLowerCase().includes(ql) ||
+          !!matchedAlias ||
+          e.tags.some((t) => t.toLowerCase().includes(ql)) ||
+          e.type.toLowerCase().includes(ql) ||
+          e.summary.toLowerCase().includes(ql);
+        return matched ? { entity: e, matchedAlias } : null;
+      })
+      .filter(Boolean)
+      .slice(0, 8) as { entity: typeof data.entities[number]; matchedAlias?: string }[];
   }, [q, data.entities]);
 
   return (
@@ -41,7 +50,7 @@ export default function Topbar({ useStore, isMobile }:
             border: "1px solid var(--border)", borderRadius: 10,
             boxShadow: "var(--shadow-md)", zIndex: 100, overflow: "hidden",
           }}>
-            {hits.map((e) => (
+            {hits.map(({ entity: e, matchedAlias }) => (
               <button
                 key={e.id}
                 style={{
@@ -51,7 +60,14 @@ export default function Topbar({ useStore, isMobile }:
                 }}
                 onClick={() => { setSelected(e.id); setQ(""); }}
               >
-                <div style={{ fontWeight: 600 }}>{e.id}</div>
+                <div style={{ fontWeight: 600 }}>
+                  {e.id}
+                  {matchedAlias && (
+                    <span style={{ fontWeight: 400, fontSize: 12, color: "var(--muted)", marginLeft: 6 }}>
+                      ({matchedAlias})
+                    </span>
+                  )}
+                </div>
                 <div style={{ fontSize: 11, color: "var(--muted)" }}>{e.type}</div>
               </button>
             ))}

@@ -300,8 +300,45 @@ a:hover { text-decoration: underline; }
     border-bottom: 1px solid var(--border);
     box-shadow: 0 1px 3px rgba(0,0,0,.05);
   }
-  .timeline.open { height: 110px; }
-  .timeline.open.tall { height: 200px; }
+  .timeline.open { height: 100px; }
+  .timeline.open.tall { height: 180px; }
+  .timeline .track { padding: 4px 12px 6px; }
+
+  /* Even-spaced mobile axis */
+  .timeline .axis-even {
+    display: flex; position: relative; height: 100%;
+  }
+  .timeline .axis-even::before {
+    content: ""; position: absolute; left: 0; right: 0;
+    top: 50%; border-top: 1px dashed var(--border);
+  }
+  .timeline .evt-slot {
+    position: absolute; top: 0; bottom: 0; width: 140px;
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 2px;
+  }
+  .timeline .evt-slot .year {
+    position: static; transform: none;
+    font-size: 10px; color: var(--muted);
+    font-family: ui-monospace, Menlo, monospace;
+    white-space: nowrap;
+  }
+  .timeline .evt-slot .dot {
+    position: static; transform: none;
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--accent); border: 2px solid var(--panel);
+    cursor: pointer; flex-shrink: 0;
+  }
+  .timeline .evt-slot .dot.hit {
+    background: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  .timeline .evt-slot .label {
+    position: static; transform: none;
+    font-size: 10px; color: var(--muted);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    max-width: 130px; text-align: center;
+  }
 }
 .timeline .bar {
   display: flex; align-items: center; height: 34px;
@@ -337,12 +374,14 @@ a:hover { text-decoration: underline; }
   top: calc(50% + 10px);
   font-size: 11px; color: var(--muted); white-space: nowrap;
   max-width: 140px; overflow: hidden; text-overflow: ellipsis;
+  pointer-events: none;
 }
 .timeline .year {
   position: absolute; transform: translate(-50%, -100%);
   top: calc(50% - 10px);
   font-size: 10px; color: var(--muted);
   font-family: ui-monospace, Menlo, monospace;
+  white-space: nowrap; pointer-events: none;
 }
 
 /* ---------- Mobile tab toggle (top-right pill) ---------- */

@@ -41,7 +41,16 @@ export default function Timeline({ useStore, isMobile }:
     return ys;
   }, [selectedId, withYear]);
 
+  const sorted = useMemo(
+    () => [...withYear].sort((a, b) => a.year - b.year),
+    [withYear],
+  );
+
   const formatYear = (y: number) => y < 0 ? `前${-y}` : `${y}`;
+
+  // Mobile: even spacing to avoid label overlap from clustered dates.
+  // Desktop: proportional positioning on full width.
+  const MOBILE_SLOT = 140; // px per event slot
 
   return (
     <div className={`timeline ${open ? (tall ? "open tall" : "open") : "closed"}`}>
@@ -60,26 +69,48 @@ export default function Timeline({ useStore, isMobile }:
       </div>
       {open && (
         <div className="track">
-          <div className="axis" style={{ width: isMobile ? `${Math.max(600, withYear.length * 120)}px` : "100%" }}>
-            {withYear.map((e) => {
-              const pct = ((e.year - minY) / (maxY - minY)) * 100;
-              const isHit = relatedYears?.has(e.year) ?? false;
-              return (
-                <div key={e.id} style={{ left: `${pct}%`, position: "absolute", top: 0, bottom: 0 }}>
-                  <div className="year" style={{ left: 0 }}>{formatYear(e.year)}</div>
-                  <div
-                    className={`dot ${isHit ? "hit" : ""}`}
-                    onClick={() => {
-                      // Jump to the first place/actor with data.
-                      const target = e.places[0] || e.actors[0];
-                      if (target) setSelected(target);
-                    }}
-                  />
-                  <div className="label" title={e.summary}>{e.summary}</div>
-                </div>
-              );
-            })}
-          </div>
+          {isMobile ? (
+            /* ── Mobile: horizontal card list, evenly spaced ── */
+            <div className="axis axis-even" style={{ width: `${sorted.length * MOBILE_SLOT}px` }}>
+              {sorted.map((e, i) => {
+                const isHit = relatedYears?.has(e.year) ?? false;
+                return (
+                  <div key={e.id} className="evt-slot" style={{ left: `${i * MOBILE_SLOT}px` }}>
+                    <div className="year">{formatYear(e.year)}</div>
+                    <div
+                      className={`dot ${isHit ? "hit" : ""}`}
+                      onClick={() => {
+                        const target = e.places[0] || e.actors[0];
+                        if (target) setSelected(target);
+                      }}
+                    />
+                    <div className="label" title={e.summary}>{e.summary}</div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            /* ── Desktop: proportional on full width ── */
+            <div className="axis" style={{ width: "100%" }}>
+              {sorted.map((e) => {
+                const pct = ((e.year - minY) / (maxY - minY)) * 100;
+                const isHit = relatedYears?.has(e.year) ?? false;
+                return (
+                  <div key={e.id} style={{ left: `${pct}%`, position: "absolute", top: 0, bottom: 0 }}>
+                    <div className="year">{formatYear(e.year)}</div>
+                    <div
+                      className={`dot ${isHit ? "hit" : ""}`}
+                      onClick={() => {
+                        const target = e.places[0] || e.actors[0];
+                        if (target) setSelected(target);
+                      }}
+                    />
+                    <div className="label" title={e.summary}>{e.summary}</div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
     </div>

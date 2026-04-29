@@ -25,9 +25,30 @@ npm run build
 
 ## Dev loop
 
-`npm run dev` starts Vite with HMR. Mock data can be pasted into the
-`__TRIP_DATA__` placeholder in `index.html`, or just drop a
-`data/trip.json` next to a copied `explorer.html` and double-click.
+```bash
+cd web
+npm install     # first time only
+npm run dev     # http://localhost:5173 — Egypt south fixture pre-loaded
+```
+
+`vite.config.ts` ships a small dev-only plugin that, on every page load,
+inlines `fixtures/<FIXTURE>/data/trip.json` into the `__TRIP_DATA__`
+placeholder of `index.html`. The default fixture is `egypt-south`; switch
+with the `FIXTURE` env var:
+
+```bash
+FIXTURE=other-route npm run dev
+```
+
+The plugin is `apply: "serve"` only — `npm run build` leaves
+`__TRIP_DATA__` as `null`, so the upstream `scripts/inject.py` pipeline
+keeps full control of the production single-file output.
+
+If a fixture has no `data/trip.json` yet, regenerate it:
+
+```bash
+python3 scripts/export_data.py --trip-root fixtures/egypt-south
+```
 
 ## Architecture
 

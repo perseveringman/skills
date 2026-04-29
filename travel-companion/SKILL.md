@@ -223,6 +223,29 @@ of every existing file before creating a new one.
 
 ---
 
+## Test fixtures
+
+A ready-made dataset for the **Egypt south route** (Aswan → Abu Simbel →
+Kom Ombo → Edfu → Esna → Luxor) ships under `fixtures/egypt-south/`.
+It contains 21 pre-built entity markdown files, 4 recommendation samples
+(one per category), an `extraction.json` that reproduces the same wiki via
+the upsert pipeline, and a 10-line `session-log.jsonl`.
+
+Use it when:
+
+- Smoke-testing changes to `scripts/ingest.py`, `geocode.py`,
+  `export_data.py`, or `inject.py` — copy the fixture into a temp dir and
+  run the pipeline end-to-end (see `fixtures/egypt-south/README.md`).
+- Iterating on the explorer UI — `cd web && npm run dev` auto-injects
+  `fixtures/egypt-south/data/trip.json` into the `__TRIP_DATA__`
+  placeholder so the SPA opens fully populated. Override the dataset with
+  `FIXTURE=<name> npm run dev`.
+- Onboarding: reading the entity files is the fastest way to learn the
+  expected frontmatter shape and prose conventions.
+
+Add new fixtures the same way (one folder per scenario) when a route
+exposes a workflow that the Egypt fixture does not.
+
 ## Safety & etiquette
 
 - Nominatim has a 1 req/s rate limit and requires a real `User-Agent`. The
@@ -231,6 +254,4 @@ of every existing file before creating a new one.
   without explicit user request — the user considers this a memento.
 - Coordinates from Nominatim can be wrong for obscure places. If a user
   corrects a coordinate, write it into the entity frontmatter and add
-  `coords_source: user` so future runs don't overwrite it.
-rrects a coordinate, write it into the entity frontmatter and add
   `coords_source: user` so future runs don't overwrite it.

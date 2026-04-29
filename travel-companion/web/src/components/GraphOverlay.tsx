@@ -30,8 +30,8 @@ function subgraph(entities: Entity[], rootId: string | null, hops: 1 | 2): Entit
   return entities.filter((e) => visited.has(e.id));
 }
 
-export default function GraphOverlay({ useStore, isMobile }:
-  { useStore: TripStore; isMobile: boolean }) {
+export default function GraphOverlay({ useStore, isMobile, graphVisible }:
+  { useStore: TripStore; isMobile: boolean; graphVisible?: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<Core | null>(null);
   const data = useStore((s) => s.data);
@@ -43,6 +43,7 @@ export default function GraphOverlay({ useStore, isMobile }:
   const setGraphNeighborHops = useStore((s) => s.setGraphNeighborHops);
   const expanded = useStore((s) => s.graphExpanded);
   const setExpanded = useStore((s) => s.setGraphExpanded);
+  const setGraphVisible = useStore((s) => s.setGraphVisible);
 
   const [collapsed, setCollapsed] = useState(false); // desktop minimize-to-pill
 
@@ -82,24 +83,28 @@ export default function GraphOverlay({ useStore, isMobile }:
     const cy = cytoscape({
       container: containerRef.current,
       wheelSensitivity: 0.25,
+      // On mobile the container background is handled by CSS (.mobile-overlay),
+      // so we keep the canvas itself transparent.
       style: [
         { selector: "node", style: {
           "background-color": (ele: any) => colorForType(ele.data("type")),
+          "background-opacity": 1,
           "label": "data(label)",
-          "font-size": isMobile ? 12 : 10,
+          "font-size": isMobile ? 13 : 10,
           "color": "#1f1f1b",
           "text-valign": "bottom",
           "text-margin-y": 3,
           "text-outline-color": "#fafaf7",
-          "text-outline-width": 2,
-          "width": isMobile ? 20 : 16,
-          "height": isMobile ? 20 : 16,
-          "border-width": 1,
-          "border-color": "rgba(0,0,0,.15)",
+          "text-outline-width": isMobile ? 3 : 2,
+          "width": isMobile ? 22 : 16,
+          "height": isMobile ? 22 : 16,
+          "border-width": isMobile ? 2 : 1,
+          "border-color": isMobile ? "rgba(0,0,0,.25)" : "rgba(0,0,0,.15)",
         } as any },
-        { selector: "node[?hasCoords]", style: { "border-color": "#c6652a", "border-width": 2 } },
+        { selector: "node[?hasCoords]", style: { "border-color": "#c6652a", "border-width": isMobile ? 3 : 2 } },
         { selector: "edge", style: {
-          "width": 1, "line-color": "rgba(80,80,80,.22)",
+          "width": isMobile ? 1.5 : 1,
+          "line-color": isMobile ? "rgba(80,80,80,.35)" : "rgba(80,80,80,.22)",
           "curve-style": "straight",
         } },
         { selector: "node.selected", style: {
@@ -122,8 +127,6 @@ export default function GraphOverlay({ useStore, isMobile }:
     cy.elements().remove();
     cy.add(elements);
 
-    // If the container hasn't been laid out yet (0×0), wait for the next
-    // frame — otherwise fcose collapses the graph onto a diagonal line.
     const runLayout = () => {
       const box = cy.container()?.getBoundingClientRect();
       if (!box || box.width < 80 || box.height < 80) {
@@ -134,11 +137,8 @@ export default function GraphOverlay({ useStore, isMobile }:
       cy.layout(({
         name: "fcose",
         animate: false,
-        // randomize=true is critical: without it every node starts at (0,0)
-        // and the force simulation degenerates into a straight line.
         randomize: true,
         quality: "default",
-        // Scale forces by node count so small and large graphs both look OK.
         nodeRepulsion: () => 8000 + nodeCount * 200,
         idealEdgeLength: () => 90,
         edgeElasticity: () => 0.45,
@@ -154,7 +154,7 @@ export default function GraphOverlay({ useStore, isMobile }:
     runLayout();
   }, [elements]);
 
-  // Visual selection state.
+  // Visual selection state + center viewport.
   useEffect(() => {
     const cy = cyRef.current;
     if (!cy) return;
@@ -164,30 +164,23 @@ export default function GraphOverlay({ useStore, isMobile }:
       if (n.length) {
         n.addClass("selected");
         cy.center(n);
-        // On mobile, the bottom drawer (55vh) covers the lower portion of the
-        // graph canvas.  Shift the viewport up so the selected node sits in the
-        // centre of the *visible* area above the drawer rather than the
-        // geometric centre of the full canvas.
         if (isMobile) {
-          const drawerH = window.innerHeight * 0.55; // matches CSS: height 55vh
+          // On mobile the bottom drawer covers ~55vh; shift up so node is
+          // visible in the area above the drawer.
+          const drawerH = window.innerHeight * 0.55;
           cy.panBy({ x: 0, y: -drawerH / 2 });
         }
       }
     }
   }, [selectedId, isMobile]);
 
-  // Resize + re-fit when the container resizes. If the graph was laid out
-  // while the container was tiny, we also nudge fcose again once we have
-  // real space — but only when nodes are bunched (heuristic: all within a
-  // small bounding box).
+  // Re-fit on container resize.
   useEffect(() => {
     if (!containerRef.current) return;
     const obs = new ResizeObserver(() => {
       const cy = cyRef.current;
       if (!cy) return;
       cy.resize();
-      // Detect degenerate line layout: compute nodes' bounding box vs
-      // container, and re-layout if dimensions are absurd.
       const bb = cy.nodes().boundingBox({});
       const w = bb.w, h = bb.h;
       const degenerate = cy.nodes().length > 3 && (w < 40 || h < 40 || w / Math.max(h, 1) > 20 || h / Math.max(w, 1) > 20);
@@ -204,12 +197,13 @@ export default function GraphOverlay({ useStore, isMobile }:
     return () => obs.disconnect();
   }, []);
 
-  // Desktop: the wrapping layer gets 'expanded' class styled in CSS.
+  // Desktop expanded state.
   useEffect(() => {
     const el = containerRef.current?.parentElement;
     if (el) el.classList.toggle("expanded", expanded);
   }, [expanded]);
 
+  // Desktop: collapsed pill
   if (!isMobile && collapsed) {
     return (
       <button
@@ -226,11 +220,26 @@ export default function GraphOverlay({ useStore, isMobile }:
 
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
+      {/* Cytoscape canvas */}
       <div ref={containerRef} style={{ position: "absolute", inset: 0 }} />
+
+      {/* ── Mobile: close button (shown when graph is visible) ── */}
+      {isMobile && graphVisible && (
+        <button
+          className="graph-close-btn"
+          onClick={() => setGraphVisible(false)}
+          aria-label="关闭图谱"
+        >×</button>
+      )}
+
+      {/* ── Graph toolbar (mode selector etc.) ── */}
       <div style={{
-        position: "absolute", top: 6, left: 6, right: 6,
+        position: "absolute", top: 6, left: 6,
+        right: isMobile ? 44 : 6,   // leave room for close btn on mobile
         display: "flex", gap: 4, pointerEvents: "auto",
         flexWrap: "wrap",
+        // Hide toolbar when mobile graph is not visible
+        ...(isMobile && !graphVisible ? { display: "none" } : {}),
       }}>
         <select
           value={graphMode}
@@ -251,26 +260,26 @@ export default function GraphOverlay({ useStore, isMobile }:
               borderRadius: 6, background: "var(--panel)" }}
           >{graphNeighborHops}跳</button>
         )}
-        <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
-          {!isMobile && (
-            <>
-              <button
-                onClick={() => setExpanded(!expanded)}
-                title={expanded ? "缩小" : "放大"}
-                style={{ fontSize: 13, padding: "3px 8px", border: "1px solid var(--border)",
-                  borderRadius: 6, background: "var(--panel)" }}
-              >{expanded ? "⇲" : "⇱"}</button>
-              <button
-                onClick={() => setCollapsed(true)}
-                title="收起"
-                style={{ fontSize: 13, padding: "3px 8px", border: "1px solid var(--border)",
-                  borderRadius: 6, background: "var(--panel)" }}
-              >×</button>
-            </>
-          )}
-        </div>
+        {!isMobile && (
+          <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
+            <button
+              onClick={() => setExpanded(!expanded)}
+              title={expanded ? "缩小" : "放大"}
+              style={{ fontSize: 13, padding: "3px 8px", border: "1px solid var(--border)",
+                borderRadius: 6, background: "var(--panel)" }}
+            >{expanded ? "⇲" : "⇱"}</button>
+            <button
+              onClick={() => setCollapsed(true)}
+              title="收起"
+              style={{ fontSize: 13, padding: "3px 8px", border: "1px solid var(--border)",
+                borderRadius: 6, background: "var(--panel)" }}
+            >×</button>
+          </div>
+        )}
       </div>
-      {selectedId == null && graphMode === "neighbors" && (
+
+      {/* Empty state hint */}
+      {selectedId == null && graphMode === "neighbors" && (!isMobile || graphVisible) && (
         <div style={{
           position: "absolute", inset: 0, display: "flex",
           alignItems: "center", justifyContent: "center",

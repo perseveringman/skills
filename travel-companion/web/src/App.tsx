@@ -7,7 +7,6 @@ import DetailDrawer from "./components/DetailDrawer";
 import Timeline from "./components/Timeline";
 import Legend from "./components/Legend";
 import Topbar from "./components/Topbar";
-import MobileTabs from "./components/MobileTabs";
 import EmptyState from "./components/EmptyState";
 
 interface Props { useStore: TripStore; }
@@ -16,7 +15,8 @@ export default function App({ useStore }: Props) {
   const data = useStore((s) => s.data);
   const selectedId = useStore((s) => s.selectedId);
   const setSelected = useStore((s) => s.setSelected);
-  const activeTab = useStore((s) => s.activeTab);
+  const graphVisible = useStore((s) => s.graphVisible);
+  const setGraphVisible = useStore((s) => s.setGraphVisible);
 
   const isMobile = useIsMobile();
 
@@ -45,18 +45,33 @@ export default function App({ useStore }: Props) {
       {isMobile && <Timeline useStore={useStore} isMobile={isMobile} />}
 
       <div className="stage">
-        {/* On desktop both layers coexist. On mobile we switch with a tab bar. */}
-        {(!isMobile || activeTab === "map") && (
-          <div className="layer map-layer">
-            <MapView useStore={useStore} isMobile={isMobile} />
-          </div>
+        {/* Map is always rendered on both mobile and desktop */}
+        <div className="layer map-layer">
+          <MapView useStore={useStore} isMobile={isMobile} />
+        </div>
+
+        {/* Graph:
+            - Desktop: floating overlay panel (bottom-right)
+            - Mobile:  semi-transparent full-canvas overlay, shown/hidden via graphVisible */}
+        <div className={
+          isMobile
+            ? `layer graph-layer mobile-overlay${graphVisible ? "" : " hidden"}`
+            : "layer graph-layer overlay"
+        }>
+          <GraphOverlay useStore={useStore} isMobile={isMobile} graphVisible={graphVisible} />
+        </div>
+
+        {/* Mobile: "show graph" toggle button — rendered OUTSIDE the overlay
+            so it remains clickable even when the overlay is pointer-events:none */}
+        {isMobile && !graphVisible && (
+          <button
+            className="graph-toggle-btn"
+            onClick={() => setGraphVisible(true)}
+            aria-label="显示图谱"
+          >
+            🕸️ 图谱
+          </button>
         )}
-        {(!isMobile || activeTab === "graph") && (
-          <div className={`layer graph-layer ${isMobile ? "full" : "overlay"}`}>
-            <GraphOverlay useStore={useStore} isMobile={isMobile} />
-          </div>
-        )}
-        {isMobile && <MobileTabs useStore={useStore} />}
       </div>
 
       {/* Desktop: timeline below stage */}

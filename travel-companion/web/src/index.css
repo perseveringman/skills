@@ -287,73 +287,40 @@ a:hover { text-decoration: underline; }
   border-top: 1px solid var(--border);
   box-shadow: 0 -1px 3px rgba(0,0,0,.05);
   overflow: hidden;
-  transition: height .25s ease;
 }
 .timeline.closed { height: 34px; }
-.timeline.open { height: 96px; overflow: visible; }
-.timeline.open.tall { height: 180px; overflow: visible; }
+/* open/tall: use auto height so detail panel is not clipped */
+.timeline.open, .timeline.open.tall { height: auto; }
 
-/* Mobile: timeline sits between topbar and stage, border adjustments */
+/* Mobile: timeline sits between topbar and stage */
 @media (max-width: 768px) {
   .timeline {
     border-top: none;
     border-bottom: 1px solid var(--border);
     box-shadow: 0 1px 3px rgba(0,0,0,.05);
   }
-  .timeline.open { height: 100px; overflow: visible; }
-  .timeline.open.tall { height: 180px; overflow: visible; }
-  .timeline .track { padding: 4px 12px 6px; }
-
-  /* Even-spaced mobile axis */
-  .timeline .axis-even {
-    display: flex; position: relative; height: 100%;
-  }
-  .timeline .axis-even::before {
-    content: ""; position: absolute; left: 0; right: 0;
-    top: 50%; border-top: 1px dashed var(--border);
-  }
-  .timeline .evt-slot {
-    position: absolute; top: 0; bottom: 0; width: 140px;
-    display: flex; flex-direction: column; align-items: center;
-    justify-content: center; gap: 2px;
-  }
-  .timeline .evt-slot .year {
-    position: static; transform: none;
-    font-size: 10px; color: var(--muted);
-    font-family: ui-monospace, Menlo, monospace;
-    white-space: nowrap;
-  }
-  .timeline .evt-slot .dot {
-    position: static; transform: none;
-    width: 8px; height: 8px; border-radius: 50%;
-    background: var(--accent); border: 2px solid var(--panel);
-    cursor: pointer; flex-shrink: 0;
-  }
-  .timeline .evt-slot .dot.hit {
-    background: var(--accent);
-    box-shadow: 0 0 0 3px var(--accent-soft);
-  }
-  .timeline .evt-slot .label {
-    position: static; transform: none;
-    font-size: 10px; color: var(--muted);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    max-width: 130px; text-align: center;
-  }
 }
+
 .timeline .bar {
   display: flex; align-items: center; height: 34px;
   padding: 0 14px; font-size: 12px; color: var(--muted);
   gap: 10px; cursor: pointer; user-select: none;
 }
 .timeline .bar .count { color: var(--text); font-weight: 600; }
+
 .timeline .track {
-  position: relative; height: calc(100% - 34px);
+  position: relative;
+  height: 62px;          /* fixed track height for dots */
   padding: 6px 14px 10px;
   overflow-x: auto;
-  overflow-y: visible;
+  overflow-y: hidden;
   white-space: nowrap;
   -webkit-overflow-scrolling: touch;
 }
+@media (max-width: 768px) {
+  .timeline .track { height: 60px; padding: 4px 12px 6px; }
+}
+
 .timeline .axis {
   position: relative; height: 100%; min-width: 100%;
 }
@@ -369,6 +336,10 @@ a:hover { text-decoration: underline; }
   cursor: pointer;
 }
 .timeline .dot.hit { background: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+.timeline .dot.active {
+  background: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft);
+  transform: translate(-50%, -50%) scale(1.4);
+}
 .timeline .label {
   position: absolute; transform: translate(-50%, 0);
   top: calc(50% + 10px);
@@ -383,65 +354,86 @@ a:hover { text-decoration: underline; }
   font-family: ui-monospace, Menlo, monospace;
   white-space: nowrap; pointer-events: none;
 }
-.timeline .dot.active {
-  background: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft);
-  transform: translate(-50%, -50%) scale(1.4);
+
+/* Mobile even-spaced axis */
+@media (max-width: 768px) {
+  .timeline .axis-even {
+    display: flex; position: relative; height: 100%;
+  }
+  .timeline .axis-even::before {
+    content: ""; position: absolute; left: 0; right: 0;
+    top: 50%; border-top: 1px dashed var(--border);
+  }
+  .timeline .evt-slot {
+    position: absolute; top: 0; bottom: 0; width: 140px;
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 2px;
+  }
+  .timeline .evt-slot .year {
+    position: static; transform: none;
+    font-size: 10px; white-space: nowrap;
+  }
+  .timeline .evt-slot .dot {
+    position: static; transform: none;
+    width: 8px; height: 8px; flex-shrink: 0;
+  }
+  .timeline .evt-slot .dot.active {
+    transform: none; scale: 1.3;
+  }
+  .timeline .evt-slot .label {
+    position: static; transform: none;
+    font-size: 10px; max-width: 130px; text-align: center;
+  }
 }
 
-/* Event detail popover */
+/* ── Inline event detail panel (below track, not inside it) ── */
 .timeline .evt-detail {
-  position: absolute;
-  top: calc(50% + 16px);
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 100;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  box-shadow: var(--shadow-md);
-  padding: 10px 12px;
-  min-width: 180px;
-  max-width: 260px;
-  white-space: normal;
+  background: var(--panel-2);
+  border-top: 1px solid var(--border);
+  padding: 8px 14px 10px;
+  display: flex; flex-direction: column; gap: 6px;
+  animation: evt-slide-in .15s ease;
 }
-.timeline .evt-summary {
-  font-size: 13px;
-  color: var(--text);
-  line-height: 1.4;
-  margin-bottom: 6px;
+@keyframes evt-slide-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
-.timeline .evt-links {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px;
-  margin-top: 4px;
+.timeline .evt-detail-head {
+  display: flex; align-items: baseline; gap: 8px;
 }
-.timeline .evt-links-label {
-  font-size: 11px;
+.timeline .evt-detail-year {
+  font-size: 12px; font-weight: 700; color: var(--accent);
+  font-family: ui-monospace, Menlo, monospace;
   flex-shrink: 0;
 }
-.timeline .evt-links button {
-  background: var(--panel-2);
+.timeline .evt-detail-summary {
+  font-size: 13px; color: var(--text); line-height: 1.4;
+  flex: 1; min-width: 0;
+}
+.timeline .evt-detail-close {
+  background: none; border: none; font-size: 16px;
+  color: var(--muted); cursor: pointer; padding: 0 2px;
+  flex-shrink: 0; line-height: 1;
+}
+.timeline .evt-detail-close:hover { color: var(--text); }
+.timeline .evt-detail-links {
+  display: flex; flex-wrap: wrap; gap: 6px;
+}
+.timeline .evt-chip {
+  background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 2px 8px;
+  border-radius: 8px;
+  padding: 3px 10px;
   font-size: 12px;
-  color: var(--accent);
   cursor: pointer;
   white-space: nowrap;
 }
-.timeline .evt-links button:hover {
+.timeline .evt-chip.place { color: var(--accent); }
+.timeline .evt-chip.actor { color: #6a7b8b; }
+.timeline .evt-chip:hover {
   background: var(--accent-soft);
   border-color: var(--accent);
-}
-
-/* Mobile overrides for evt-detail */
-@media (max-width: 768px) {
-  .timeline .evt-detail {
-    left: 0; transform: none;
-    top: 100%; min-width: 160px;
-  }
+  color: var(--accent);
 }
 
 /* ---------- Mobile tab toggle (top-right pill) ---------- */

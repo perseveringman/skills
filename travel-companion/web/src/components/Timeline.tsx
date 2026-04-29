@@ -49,12 +49,12 @@ export default function Timeline({ useStore, isMobile }:
 
   const formatYear = (y: number) => y < 0 ? `前${-y}` : `${y}`;
 
-  // Mobile: even spacing to avoid label overlap from clustered dates.
-  // Desktop: proportional positioning on full width.
-  const MOBILE_SLOT = 140; // px per event slot
+  const MOBILE_SLOT = 140;
 
-  // Render a single event node (shared between mobile & desktop)
-  const renderEvt = (e: TripEvent & { year: number }, isHit: boolean) => {
+  const activeEvent = activeEvt ? sorted.find((e) => e.id === activeEvt) : null;
+
+  // Render a dot node (no popover — detail is rendered separately below track)
+  const renderDot = (e: TripEvent & { year: number }, isHit: boolean) => {
     const active = activeEvt === e.id;
     return (
       <>
@@ -64,33 +64,12 @@ export default function Timeline({ useStore, isMobile }:
           onClick={(ev) => { ev.stopPropagation(); setActiveEvt(active ? null : e.id); }}
         />
         <div className="label" title={e.summary}>{e.summary}</div>
-        {active && (
-          <div className="evt-detail" onClick={(ev) => ev.stopPropagation()}>
-            <div className="evt-summary">{e.summary}</div>
-            {e.places.length > 0 && (
-              <div className="evt-links">
-                <span className="evt-links-label">📍</span>
-                {e.places.map((p) => (
-                  <button key={p} onClick={() => setSelected(p)}>{p}</button>
-                ))}
-              </div>
-            )}
-            {e.actors.length > 0 && (
-              <div className="evt-links">
-                <span className="evt-links-label">👤</span>
-                {e.actors.map((a) => (
-                  <button key={a} onClick={() => setSelected(a)}>{a}</button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
       </>
     );
   };
 
   return (
-    <div className={`timeline ${open ? (tall ? "open tall" : "open") : "closed"}`}>
+    <div className={`timeline ${open ? (tall ? "open tall" : "open") : "closed"} ${activeEvent ? "has-detail" : ""}`}>
       <div className="bar" onClick={() => setOpen(!open)}
            onDoubleClick={(e) => { e.stopPropagation(); setTall(!tall); setOpen(true); }}>
         <span>📅 历史时间轴</span>
@@ -105,34 +84,53 @@ export default function Timeline({ useStore, isMobile }:
         <span style={{ color: "var(--muted)" }}>{open ? "▾" : "▸"}</span>
       </div>
       {open && (
-        <div className="track">
-          {isMobile ? (
-            /* ── Mobile: horizontal card list, evenly spaced ── */
-            <div className="axis axis-even" style={{ width: `${sorted.length * MOBILE_SLOT}px` }}>
-              {sorted.map((e, i) => {
-                const isHit = relatedYears?.has(e.year) ?? false;
-                return (
-                  <div key={e.id} className="evt-slot" style={{ left: `${i * MOBILE_SLOT}px` }}>
-                    {renderEvt(e, isHit)}
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            /* ── Desktop: proportional on full width ── */
-            <div className="axis" style={{ width: "100%" }}>
-              {sorted.map((e) => {
-                const pct = ((e.year - minY) / (maxY - minY)) * 100;
-                const isHit = relatedYears?.has(e.year) ?? false;
-                return (
-                  <div key={e.id} style={{ left: `${pct}%`, position: "absolute", top: 0, bottom: 0 }}>
-                    {renderEvt(e, isHit)}
-                  </div>
-                );
-              })}
+        <>
+          <div className="track">
+            {isMobile ? (
+              <div className="axis axis-even" style={{ width: `${sorted.length * MOBILE_SLOT}px` }}>
+                {sorted.map((e, i) => {
+                  const isHit = relatedYears?.has(e.year) ?? false;
+                  return (
+                    <div key={e.id} className="evt-slot" style={{ left: `${i * MOBILE_SLOT}px` }}>
+                      {renderDot(e, isHit)}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="axis" style={{ width: "100%" }}>
+                {sorted.map((e) => {
+                  const pct = ((e.year - minY) / (maxY - minY)) * 100;
+                  const isHit = relatedYears?.has(e.year) ?? false;
+                  return (
+                    <div key={e.id} style={{ left: `${pct}%`, position: "absolute", top: 0, bottom: 0 }}>
+                      {renderDot(e, isHit)}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Inline detail panel — outside .track so no overflow clipping */}
+          {activeEvent && (
+            <div className="evt-detail">
+              <div className="evt-detail-head">
+                <span className="evt-detail-year">{formatYear(activeEvent.year)}</span>
+                <span className="evt-detail-summary">{activeEvent.summary}</span>
+                <button className="evt-detail-close" onClick={() => setActiveEvt(null)}>×</button>
+              </div>
+              <div className="evt-detail-links">
+                {activeEvent.places.map((p) => (
+                  <button key={p} className="evt-chip place" onClick={() => setSelected(p)}>📍 {p}</button>
+                ))}
+                {activeEvent.actors.map((a) => (
+                  <button key={a} className="evt-chip actor" onClick={() => setSelected(a)}>👤 {a}</button>
+                ))}
+              </div>
             </div>
           )}
-        </div>
+        </>
       )}
     </div>
   );

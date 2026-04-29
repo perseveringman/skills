@@ -10,6 +10,7 @@ export default function Timeline({ useStore, isMobile }:
   const open = useStore((s) => s.timelineOpen);
   const setOpen = useStore((s) => s.setTimelineOpen);
   const [tall, setTall] = useState(false);
+  const [activeEvt, setActiveEvt] = useState<string | null>(null);
 
   // Auto-open timeline on mobile so it's immediately visible
   useEffect(() => {
@@ -52,6 +53,42 @@ export default function Timeline({ useStore, isMobile }:
   // Desktop: proportional positioning on full width.
   const MOBILE_SLOT = 140; // px per event slot
 
+  // Render a single event node (shared between mobile & desktop)
+  const renderEvt = (e: TripEvent & { year: number }, isHit: boolean) => {
+    const active = activeEvt === e.id;
+    return (
+      <>
+        <div className="year">{formatYear(e.year)}</div>
+        <div
+          className={`dot ${isHit ? "hit" : ""} ${active ? "active" : ""}`}
+          onClick={(ev) => { ev.stopPropagation(); setActiveEvt(active ? null : e.id); }}
+        />
+        <div className="label" title={e.summary}>{e.summary}</div>
+        {active && (
+          <div className="evt-detail" onClick={(ev) => ev.stopPropagation()}>
+            <div className="evt-summary">{e.summary}</div>
+            {e.places.length > 0 && (
+              <div className="evt-links">
+                <span className="evt-links-label">📍</span>
+                {e.places.map((p) => (
+                  <button key={p} onClick={() => setSelected(p)}>{p}</button>
+                ))}
+              </div>
+            )}
+            {e.actors.length > 0 && (
+              <div className="evt-links">
+                <span className="evt-links-label">👤</span>
+                {e.actors.map((a) => (
+                  <button key={a} onClick={() => setSelected(a)}>{a}</button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </>
+    );
+  };
+
   return (
     <div className={`timeline ${open ? (tall ? "open tall" : "open") : "closed"}`}>
       <div className="bar" onClick={() => setOpen(!open)}
@@ -76,15 +113,7 @@ export default function Timeline({ useStore, isMobile }:
                 const isHit = relatedYears?.has(e.year) ?? false;
                 return (
                   <div key={e.id} className="evt-slot" style={{ left: `${i * MOBILE_SLOT}px` }}>
-                    <div className="year">{formatYear(e.year)}</div>
-                    <div
-                      className={`dot ${isHit ? "hit" : ""}`}
-                      onClick={() => {
-                        const target = e.places[0] || e.actors[0];
-                        if (target) setSelected(target);
-                      }}
-                    />
-                    <div className="label" title={e.summary}>{e.summary}</div>
+                    {renderEvt(e, isHit)}
                   </div>
                 );
               })}
@@ -97,15 +126,7 @@ export default function Timeline({ useStore, isMobile }:
                 const isHit = relatedYears?.has(e.year) ?? false;
                 return (
                   <div key={e.id} style={{ left: `${pct}%`, position: "absolute", top: 0, bottom: 0 }}>
-                    <div className="year">{formatYear(e.year)}</div>
-                    <div
-                      className={`dot ${isHit ? "hit" : ""}`}
-                      onClick={() => {
-                        const target = e.places[0] || e.actors[0];
-                        if (target) setSelected(target);
-                      }}
-                    />
-                    <div className="label" title={e.summary}>{e.summary}</div>
+                    {renderEvt(e, isHit)}
                   </div>
                 );
               })}

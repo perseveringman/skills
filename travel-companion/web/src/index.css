@@ -290,8 +290,8 @@ a:hover { text-decoration: underline; }
   transition: height .25s ease;
 }
 .timeline.closed { height: 34px; }
-.timeline.open { height: 96px; }
-.timeline.open.tall { height: 180px; }
+.timeline.open { height: 96px; overflow: visible; }
+.timeline.open.tall { height: 180px; overflow: visible; }
 
 /* Mobile: timeline sits between topbar and stage, border adjustments */
 @media (max-width: 768px) {
@@ -300,8 +300,8 @@ a:hover { text-decoration: underline; }
     border-bottom: 1px solid var(--border);
     box-shadow: 0 1px 3px rgba(0,0,0,.05);
   }
-  .timeline.open { height: 100px; }
-  .timeline.open.tall { height: 180px; }
+  .timeline.open { height: 100px; overflow: visible; }
+  .timeline.open.tall { height: 180px; overflow: visible; }
   .timeline .track { padding: 4px 12px 6px; }
 
   /* Even-spaced mobile axis */
@@ -350,7 +350,7 @@ a:hover { text-decoration: underline; }
   position: relative; height: calc(100% - 34px);
   padding: 6px 14px 10px;
   overflow-x: auto;
-  overflow-y: hidden;
+  overflow-y: visible;
   white-space: nowrap;
   -webkit-overflow-scrolling: touch;
 }
@@ -382,6 +382,66 @@ a:hover { text-decoration: underline; }
   font-size: 10px; color: var(--muted);
   font-family: ui-monospace, Menlo, monospace;
   white-space: nowrap; pointer-events: none;
+}
+.timeline .dot.active {
+  background: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft);
+  transform: translate(-50%, -50%) scale(1.4);
+}
+
+/* Event detail popover */
+.timeline .evt-detail {
+  position: absolute;
+  top: calc(50% + 16px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-md);
+  padding: 10px 12px;
+  min-width: 180px;
+  max-width: 260px;
+  white-space: normal;
+}
+.timeline .evt-summary {
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.4;
+  margin-bottom: 6px;
+}
+.timeline .evt-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+}
+.timeline .evt-links-label {
+  font-size: 11px;
+  flex-shrink: 0;
+}
+.timeline .evt-links button {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 12px;
+  color: var(--accent);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.timeline .evt-links button:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+/* Mobile overrides for evt-detail */
+@media (max-width: 768px) {
+  .timeline .evt-detail {
+    left: 0; transform: none;
+    top: 100%; min-width: 160px;
+  }
 }
 
 /* ---------- Mobile tab toggle (top-right pill) ---------- */

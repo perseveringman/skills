@@ -74,8 +74,11 @@ def derive_message(trip_dir: Path) -> str:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--trip-root", required=True,
-                    help="Path to the trip directory, e.g. trips/egypt-south")
+    ap.add_argument("--trip-root",
+                    help="Path to the trip directory, e.g. trips/egypt-south. "
+                         "If omitted, reads .workbuddy/active-trip in --cwd.")
+    ap.add_argument("--cwd", default=".",
+                    help="Working dir for the active-trip pointer (default: cwd)")
     ap.add_argument("--message", help="Override the commit message")
     ap.add_argument("--no-push", action="store_true",
                     help="Stage + commit only; skip git push")
@@ -83,7 +86,21 @@ def main() -> int:
                     help="Refuse to commit if there are unrelated staged changes")
     args = ap.parse_args()
 
-    trip_dir = Path(args.trip_root).resolve()
+    if args.trip_root:
+        trip_dir = Path(args.trip_root).resolve()
+    else:
+        pointer = Path(args.cwd).resolve() / ".workbuddy" / "active-trip"
+        if not pointer.exists():
+            print(f"! no --trip-root and no active-trip at {pointer}",
+                  file=sys.stderr)
+            return 2
+        try:
+            data = json.loads(pointer.read_text(encoding="utf-8"))
+            trip_dir = Path(data["dir"]).resolve()
+        except Exception as exc:
+            print(f"! cannot parse {pointer}: {exc}", file=sys.stderr)
+            return 2
+
     if not trip_dir.exists():
         print(f"! trip dir not found: {trip_dir}", file=sys.stderr)
         return 2

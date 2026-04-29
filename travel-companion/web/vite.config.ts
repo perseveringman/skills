@@ -2,14 +2,29 @@ import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import { viteSingleFile } from "vite-plugin-singlefile";
 import { execSync } from "node:child_process";
-import { readFileSync, existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+
+// ─── locate the trips directory ─────────────────────────────────────────
+// Precedence:
+//   1. TRIPS_DIR env var (absolute or relative to web/)
+//   2. <skill>/trips/                    ← legacy / smoke-test
+//   3. <skill>/fixtures/                 ← used as fallback for fixture lookups
+function locateTripsDir(): string | null {
+  if (process.env.TRIPS_DIR) {
+    const p = resolve(__dirname, process.env.TRIPS_DIR);
+    return existsSync(p) ? p : null;
+  }
+  const local = resolve(__dirname, "..", "trips");
+  if (existsSync(local)) return local;
+  return null;
+}
 
 // ─── dev fixture injection ──────────────────────────────────────────────
 // In `npm run dev` we inline a fixture trip.json into the __TRIP_DATA__
 // placeholder so the explorer is fully populated without needing the
-// inject.py pipeline. Default fixture = `trips/egypt-south`. Override via
-// the FIXTURE env var:
+// inject.py pipeline. Default fixture = `egypt-south`. Override via the
+// FIXTURE env var:
 //
 //     FIXTURE=other-trip npm run dev
 //
@@ -22,16 +37,22 @@ function devFixturePlugin(): Plugin {
     transformIndexHtml(html) {
       const fixtureName = process.env.FIXTURE || "egypt-south";
       if (fixtureName === "none") return html;
-      // Look in trips/ first (real data), fall back to fixtures/ (test data).
-      const candidates = [
+      // Look in TRIPS_DIR first, then <skill>/trips, then <skill>/fixtures.
+      const tripsDir = locateTripsDir();
+      const candidates: string[] = [];
+      if (tripsDir) {
+        candidates.push(resolve(tripsDir, fixtureName, "data", "trip.json"));
+      }
+      candidates.push(
         resolve(__dirname, "..", "trips", fixtureName, "data", "trip.json"),
         resolve(__dirname, "..", "fixtures", fixtureName, "data", "trip.json"),
-      ];
+      );
       const found = candidates.find((p) => existsSync(p));
       if (!found) {
         console.warn(
-          `[travel-companion] fixture not found in trips/ or fixtures/: ${fixtureName}\n` +
-            `  Tip: run \`python3 scripts/export_data.py --trip-root trips/${fixtureName}\` first.`,
+          `[travel-companion] fixture not found: ${fixtureName}\n` +
+            `  Tried:\n` +
+            candidates.map((c) => `    ${c}`).join("\n"),
         );
         return html;
       }
@@ -48,17 +69,41 @@ function devFixturePlugin(): Plugin {
 }
 
 // ─── build-time trips manifest ──────────────────────────────────────────
-// Run scripts/build_trips_manifest.py before vite builds, so the manifest
-// + per-trip JSON are ready under public/trips/ and get copied to dist/.
+// Run scripts/build_trips_manifest.py before vite builds. The script
+// itself respects TRIPS_DIR / cwd ancestor lookup, so we just pass it
+// through.
+//
+// If the trips dir doesn't exist (typical for the standalone skill repo
+// that doesn't own any real trips), we still emit an empty manifest so
+// the SPA at least renders the empty-state Home.
 function tripsManifestPlugin(): Plugin {
   return {
     name: "travel-companion-trips-manifest",
     apply: "build",
     buildStart() {
-      const cwd = resolve(__dirname, "..");
-      const cmd = "python3 scripts/build_trips_manifest.py --out-dir web/public/trips";
+      const outDir = resolve(__dirname, "public", "trips");
+      mkdirSync(outDir, { recursive: true });
+      const tripsDir = locateTripsDir();
+      if (!tripsDir) {
+        console.warn(
+          "[travel-companion] no trips dir found — emitting empty manifest. " +
+            "Set TRIPS_DIR=<path> to point at a real trips/ directory.",
+        );
+        writeFileSync(resolve(outDir, "manifest.json"), "[]");
+        return;
+      }
+      const skillRoot = resolve(__dirname, "..");
+      const script = resolve(skillRoot, "scripts", "build_trips_manifest.py");
+      const cmd = [
+        "python3",
+        JSON.stringify(script),
+        "--trips-dir",
+        JSON.stringify(tripsDir),
+        "--out-dir",
+        JSON.stringify(outDir),
+      ].join(" ");
       console.log(`[travel-companion] ${cmd}`);
-      execSync(cmd, { cwd, stdio: "inherit" });
+      execSync(cmd, { stdio: "inherit" });
     },
   };
 }
@@ -69,6 +114,8 @@ function tripsManifestPlugin(): Plugin {
 const buildMode = process.env.BUILD_MODE || "site";
 
 const sharedPlugins = [react(), devFixturePlugin()];
+
+void dirname; // keep import group tidy across linters
 
 export default defineConfig(() => {
   if (buildMode === "single") {

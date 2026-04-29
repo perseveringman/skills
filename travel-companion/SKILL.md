@@ -149,6 +149,18 @@ This is the answer to *"where do I commit this conversation?"*. The
 (a tiny JSON pointer). Every cwd / terminal can track its own trip in
 parallel.
 
+**Where do trip directories live?** `scripts/active_trip.py` resolves
+the trips root in this order:
+
+1. `--trips-dir <path>` flag
+2. `TRIPS_DIR` environment variable
+3. nearest ancestor of cwd containing a `trips/` directory
+4. fallback: `cwd/trips`
+
+So the canonical setup is: user `cd`'s into a dedicated trips repo
+(typically created by `scripts/init_trips_repo.sh ~/Trips`), and from
+there everything Just Works without any flags.
+
 The mechanism is **auto-detect + confirm in one line**: never silently
 write to a freshly-guessed slug — but also never block the conversation
 with a clarifying question when intent is obvious.
@@ -332,71 +344,74 @@ are staged.
 
 # Deployment — git push → Vercel → live site
 
-The whole skill repo (https://github.com/perseveringman/skills) is also a
-**Vercel project**. Track A's `scripts/publish.py` pushes after every
-turn, so the deployed site is always live with the latest data.
+The data lives in the **user's own trips repo** (created via
+`scripts/init_trips_repo.sh`), not in the skill repo. The skill repo
+just owns the SPA code and the build pipeline. There are two ways to
+wire up Vercel:
+
+### Option A — Submodule (recommended, simplest)
+
+In the user's trips repo:
+
+```bash
+git submodule add https://github.com/perseveringman/skills.git skill
+git commit -m "add skill submodule"
+```
+
+Then `vercel.json` (in trips repo root):
+
+```json
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "cd skill/travel-companion/web && npm install && TRIPS_DIR=$(pwd)/../../../trips npm run build && cp -R dist ../../../../dist",
+  "outputDirectory": "dist",
+  "framework": null,
+  "cleanUrls": true,
+  "rewrites": [
+    { "source": "/((?!trips/|assets/|favicon).*)", "destination": "/index.html" }
+  ]
+}
+```
+
+Skill upgrades happen via `git submodule update --remote skill && git push`.
+
+### Option B — Skill in trips repo as a build-time clone
+
+Avoids the submodule, but the skill version is pinned to whatever your
+`buildCommand` clones. Use this only if you don't want submodules.
 
 ### Layout
 
 ```
-travel-companion/
-├── trips/                          ← REAL trip data (git tracked)
+~/Trips/                         (user's trips git repo)
+├── trips/
 │   └── <slug>/
-│       ├── .trip/meta.json         (slug, title, subtitle, cover, ...)
+│       ├── .trip/meta.json
 │       ├── .trip/session-log.jsonl
-│       ├── .trip/state.json
 │       ├── wiki/entities/*.md
 │       ├── recommendations/{shots,food,itinerary,spots}/*.md
-│       └── data/trip.json          ← rebuilt by export_data.py
-├── fixtures/                       ← test data (NOT shown on the site)
-├── web/                            ← React/Vite SPA
-│   ├── index.html  vite.config.ts
-│   ├── src/main.tsx                ← hash router
-│   ├── src/Home.tsx                ← grid of trips/manifest.json
-│   ├── src/App.tsx                 ← single-trip explorer
-│   └── public/trips/               ← generated at build time, gitignored
-└── vercel.json                     ← buildCommand + cleanUrls + cache headers
+│       └── data/trip.json
+├── skill/                       (git submodule → perseveringman/skills)
+│   └── travel-companion/web/    (built by Vercel)
+├── vercel.json
+├── .gitignore                   (ignores .workbuddy/)
+└── .workbuddy/active-trip       (per-cwd pointer; gitignored)
 ```
 
-### Build flow (Vercel runs this on every push)
+### Build flow (Vercel runs this on every push to trips repo)
 
-1. Vercel clones the repo, runs `cd web && npm install && npm run build`
-   (per `vercel.json#buildCommand`).
-2. `vite build` invokes `tripsManifestPlugin` (in `web/vite.config.ts`)
-   which calls `python3 scripts/build_trips_manifest.py`.
-3. That script scans `trips/*/data/trip.json`, copies each into
-   `web/public/trips/<slug>.json`, and emits
-   `web/public/trips/manifest.json` with per-trip stats.
-4. Vite copies `public/` into `dist/`, so the deployed site has:
+1. Vercel clones the trips repo (with submodules).
+2. `vercel.json#buildCommand` cd's into `skill/travel-companion/web/`
+   and runs `npm install && TRIPS_DIR=../../trips npm run build`.
+3. `vite build` invokes `tripsManifestPlugin`, which calls
+   `python3 scripts/build_trips_manifest.py --trips-dir ../../trips
+   --out-dir public/trips`.
+4. That script scans `trips/*/data/trip.json`, copies each into
+   `public/trips/<slug>.json`, and emits `public/trips/manifest.json`.
+5. Vite copies `public/` into `dist/`. Final layout:
    - `/`                   — Home (fetches `/trips/manifest.json`)
    - `/#/t/<slug>`         — Explorer (fetches `/trips/<slug>.json`)
-5. `vercel.json#rewrites` sends every non-static path to `index.html`
-   (hash router takes over client-side).
-
-### One-time Vercel setup (only needs to happen once per repo)
-
-In the Vercel dashboard:
-
-1. **Import** `perseveringman/skills`.
-2. **Root Directory:** leave empty (use repo root). `vercel.json` will
-   handle paths.
-3. **Framework Preset:** Other.
-4. **Build & Output Settings:** override only if Vercel auto-detection
-   fails (the `vercel.json` already declares them).
-5. **Environment Variables:** none needed.
-6. **Production Branch:** `main`.
-
-After import, every `git push origin main` from `scripts/publish.py`
-triggers a redeploy automatically.
-
-### Local mirror of the deployed flow
-
-```bash
-# Re-export & rebuild manifest from real trips, then preview the site
-python3 scripts/export_data.py        --trip-root trips/<slug>
-cd web && npm run build && npm run preview -- --port 4173
-open http://localhost:4173
-```
+6. The build command copies `dist/` up to the trips repo root for Vercel.
 
 ### Track A response — when push fails
 
@@ -408,6 +423,11 @@ open http://localhost:4173
 - network → tell the user, suggest `--no-push` to commit locally.
 
 Never recover with `--force-push`; ask first.
+
+### See also
+
+`ONBOARDING.md` — step-by-step user-facing setup guide. Send users there
+when they ask "how do I start?".
 
 ---
 

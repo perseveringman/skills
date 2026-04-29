@@ -1,6 +1,7 @@
 {
   "slug": "egypt-south",
   "title": "埃及南线",
+  "aliases": ["Egypt South Route", "Aswan to Luxor"],
   "subtitle": "Aswan → Abu Simbel → Kom Ombo → Edfu → Esna → Luxor",
   "destination": "Egypt",
   "countryHint": "EG",

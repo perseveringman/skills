@@ -1,29 +1,48 @@
 #!/usr/bin/env python3
-"""Scan `trips/*/` and emit a manifest + per-trip data into the SPA's public/.
+"""Scan `<trips-dir>/` and emit a manifest + per-trip data into the SPA's public/.
 
 This is run automatically by `web/`'s build (vercel build) so the deployed
-site always reflects the live state of the `trips/` directory in git.
+site always reflects the live state of whichever `trips/` directory is
+configured.
 
-Output (relative to --out-dir, default = web/public/trips/):
+Output (relative to --out-dir):
 
-    web/public/trips/manifest.json     — list of all trips with metadata
-    web/public/trips/<slug>.json        — that trip's data/trip.json copied 1:1
+    <out-dir>/manifest.json     — list of all trips with metadata
+    <out-dir>/<slug>.json        — that trip's data/trip.json copied 1:1
 
 Usage:
 
-    python3 scripts/build_trips_manifest.py
+    # default: trips dir = $TRIPS_DIR or nearest ancestor of cwd with trips/
     python3 scripts/build_trips_manifest.py --out-dir web/public/trips
-    python3 scripts/build_trips_manifest.py --trips-dir trips
+
+    # explicit
+    python3 scripts/build_trips_manifest.py --trips-dir ~/Trips/trips
 """
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import sys
 from pathlib import Path
 
 SKILL_DIR = Path(__file__).parent.parent
+
+
+def resolve_trips_dir(cli_value: str | None, cwd: Path) -> Path:
+    if cli_value:
+        return Path(cli_value).expanduser().resolve()
+    env = os.environ.get("TRIPS_DIR")
+    if env:
+        return Path(env).expanduser().resolve()
+    cur = cwd.resolve()
+    for p in [cur, *cur.parents]:
+        candidate = p / "trips"
+        if candidate.is_dir():
+            return candidate
+    # Last resort.
+    return cur / "trips"
 
 
 def load_meta(trip_dir: Path) -> dict:
@@ -66,13 +85,17 @@ def trip_summary(trip_dir: Path, data_file: Path) -> dict:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--trips-dir", default=str(SKILL_DIR / "trips"),
-                    help="Directory containing trip folders (default: trips/)")
+    ap.add_argument("--trips-dir", default=None,
+                    help="Directory containing trip folders. "
+                         "Default: $TRIPS_DIR, or nearest ancestor with "
+                         "trips/, or cwd/trips.")
     ap.add_argument("--out-dir", default=str(SKILL_DIR / "web" / "public" / "trips"),
                     help="Directory to write manifest + per-trip JSON")
+    ap.add_argument("--cwd", default=".",
+                    help="Override the cwd used for ancestor lookup")
     args = ap.parse_args()
 
-    trips_dir = Path(args.trips_dir).resolve()
+    trips_dir = resolve_trips_dir(args.trips_dir, Path(args.cwd))
     out_dir = Path(args.out_dir).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
 

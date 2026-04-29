@@ -44,6 +44,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 import unicodedata
@@ -51,8 +52,34 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 SKILL_DIR = Path(__file__).parent.parent
-TRIPS_DIR = SKILL_DIR / "trips"
 ACTIVE_FILE_REL = Path(".workbuddy") / "active-trip"
+
+# `TRIPS_DIR` is intentionally a module-level mutable global. `main()`
+# populates it after CLI/env/heuristic resolution, then every downstream
+# helper reads the resolved path. Tests can also assign to it directly.
+TRIPS_DIR: Path = SKILL_DIR / "trips"  # placeholder; main() overrides.
+
+
+def resolve_trips_dir(cli_value: str | None, cwd: Path) -> Path:
+    """Decide where 'trips/' lives. Precedence:
+
+    1. --trips-dir CLI flag
+    2. TRIPS_DIR environment variable
+    3. nearest ancestor of cwd that contains a `trips/` directory
+       (so cd-ing into ~/Trips/ — which holds trips/ — Just Works)
+    4. cwd / "trips"  (will be created on first `new`/`resolve`)
+    """
+    if cli_value:
+        return Path(cli_value).expanduser().resolve()
+    env = os.environ.get("TRIPS_DIR")
+    if env:
+        return Path(env).expanduser().resolve()
+    cur = cwd.resolve()
+    for p in [cur, *cur.parents]:
+        candidate = p / "trips"
+        if candidate.is_dir():
+            return candidate
+    return cur / "trips"
 
 
 # ---------------------------------------------------------------------------
@@ -158,6 +185,7 @@ def write_active(cwd: Path, slug: str) -> Path:
     f.write_text(json.dumps({
         "slug": slug,
         "dir": str(TRIPS_DIR / slug),
+        "tripsDir": str(TRIPS_DIR),
         "updatedAt": datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds"),
     }, ensure_ascii=False, indent=2), encoding="utf-8")
     return f
@@ -179,6 +207,7 @@ def scaffold_trip(slug: str, title: str | None = None,
     target = TRIPS_DIR / slug
     if target.exists():
         raise FileExistsError(f"trips/{slug} already exists")
+    TRIPS_DIR.mkdir(parents=True, exist_ok=True)
     (target / ".trip").mkdir(parents=True)
     (target / "wiki" / "entities").mkdir(parents=True)
     (target / "recommendations" / "shots").mkdir(parents=True)
@@ -374,6 +403,10 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--cwd", default=".",
                     help="Where to read/write .workbuddy/active-trip (default: cwd)")
+    ap.add_argument("--trips-dir", default=None,
+                    help="Override trips directory location. "
+                         "Falls back to $TRIPS_DIR, then nearest ancestor "
+                         "of cwd containing trips/, then cwd/trips.")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     sub.add_parser("show").set_defaults(fn=cmd_show)
@@ -410,6 +443,11 @@ def main() -> int:
     p.set_defaults(fn=cmd_rename)
 
     args = ap.parse_args()
+
+    # Resolve trips dir once and pin it on the global so every helper sees it.
+    global TRIPS_DIR
+    TRIPS_DIR = resolve_trips_dir(args.trips_dir, Path(args.cwd))
+
     return args.fn(args)
 
 

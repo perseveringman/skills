@@ -1,0 +1,14 @@
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Personal cross-session memory & per-cwd skill state.
+# These are local-only — see SKILL.md "Working memory" section.
+.workbuddy/
+
+# Node / Vite (covered also by web/.gitignore for redundancy)
+node_modules/
+
+# Editor
+.vscode/
+.idea/

@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "build:preview": "tsc --noEmit && BUILD_TARGET=preview INJECT_FIXTURE=1 vite build"
+    "build:single": "tsc --noEmit && BUILD_MODE=single vite build",
+    "preview": "vite preview"
   },
   "dependencies": {
     "@rollup/wasm-node": "^4.60.2",

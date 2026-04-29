@@ -121,13 +121,37 @@ export default function GraphOverlay({ useStore, isMobile }:
     if (!cy) return;
     cy.elements().remove();
     cy.add(elements);
-    cy.layout({
-      // @ts-expect-error fcose types not fully published
-      name: "fcose", animate: false,
-      nodeRepulsion: 4500, idealEdgeLength: 70, gravity: 0.2,
-      randomize: false,
-    }).run();
-    cy.fit(undefined, 20);
+
+    // If the container hasn't been laid out yet (0×0), wait for the next
+    // frame — otherwise fcose collapses the graph onto a diagonal line.
+    const runLayout = () => {
+      const box = cy.container()?.getBoundingClientRect();
+      if (!box || box.width < 80 || box.height < 80) {
+        requestAnimationFrame(runLayout);
+        return;
+      }
+      const nodeCount = cy.nodes().length;
+      cy.layout(({
+        name: "fcose",
+        animate: false,
+        // randomize=true is critical: without it every node starts at (0,0)
+        // and the force simulation degenerates into a straight line.
+        randomize: true,
+        quality: "default",
+        // Scale forces by node count so small and large graphs both look OK.
+        nodeRepulsion: () => 8000 + nodeCount * 200,
+        idealEdgeLength: () => 90,
+        edgeElasticity: () => 0.45,
+        gravity: 0.05,
+        gravityRange: 3.0,
+        numIter: 2500,
+        tile: true,
+        nodeSeparation: 75,
+        packComponents: true,
+      } as any)).run();
+      cy.fit(undefined, 24);
+    };
+    runLayout();
   }, [elements]);
 
   // Visual selection state.
@@ -141,11 +165,30 @@ export default function GraphOverlay({ useStore, isMobile }:
     }
   }, [selectedId]);
 
-  // Resize when container resizes.
+  // Resize + re-fit when the container resizes. If the graph was laid out
+  // while the container was tiny, we also nudge fcose again once we have
+  // real space — but only when nodes are bunched (heuristic: all within a
+  // small bounding box).
   useEffect(() => {
     if (!containerRef.current) return;
-    const cy = cyRef.current;
-    const obs = new ResizeObserver(() => cy?.resize());
+    const obs = new ResizeObserver(() => {
+      const cy = cyRef.current;
+      if (!cy) return;
+      cy.resize();
+      // Detect degenerate line layout: compute nodes' bounding box vs
+      // container, and re-layout if dimensions are absurd.
+      const bb = cy.nodes().boundingBox({});
+      const w = bb.w, h = bb.h;
+      const degenerate = cy.nodes().length > 3 && (w < 40 || h < 40 || w / Math.max(h, 1) > 20 || h / Math.max(w, 1) > 20);
+      if (degenerate) {
+        cy.layout({
+          name: "fcose", animate: false, randomize: true,
+          nodeRepulsion: () => 9000, idealEdgeLength: () => 90,
+          gravity: 0.05, numIter: 2500,
+        } as any).run();
+      }
+      cy.fit(undefined, 24);
+    });
     obs.observe(containerRef.current);
     return () => obs.disconnect();
   }, []);

@@ -115,6 +115,13 @@ export default function MapView({ useStore, isMobile }:
       } else {
         m.fitBounds(bounds.pad(0.4), { animate: true, maxZoom: 12 });
       }
+      // On mobile, the bottom drawer (55vh) covers the lower portion of the
+      // map.  Shift the viewport up so targets sit in the visible area above
+      // the drawer rather than behind it.
+      if (isMobile) {
+        const drawerH = window.innerHeight * 0.55;
+        m.panBy([0, drawerH / 2], { animate: true });
+      }
     }
   }, [selectedId, byId, isMobile]);
 

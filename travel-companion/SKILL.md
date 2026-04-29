@@ -344,79 +344,67 @@ are staged.
 
 # Deployment — git push → Vercel → live site
 
-The data lives in the **user's own trips repo** (created via
-`scripts/init_trips_repo.sh`), not in the skill repo. The skill repo
-just owns the SPA code and the build pipeline. There are two ways to
-wire up Vercel:
+The user runs `scripts/init_trips_repo.sh <path>` once. That produces a
+**self-contained trips repo**:
 
-### Option A — Submodule (recommended, simplest)
+```
+~/Trips/                         (user's git repo)
+├── trips/<slug>/                ← real trip data
+│   ├── .trip/meta.json
+│   ├── wiki/entities/*.md
+│   ├── recommendations/...
+│   └── data/trip.json
+├── web/                         ← copied SPA (Vite + React)
+├── scripts/                     ← copied helpers (active_trip, publish, ...)
+├── assets/                      ← SCHEMA.md, single-file template
+├── references/                  ← extraction prompts
+├── vercel.json                  ← build & cache config
+├── README.md  ONBOARDING.md
+└── .gitignore                   (ignores .workbuddy/, dist, node_modules)
+```
 
-In the user's trips repo:
+The repo has **no runtime dependency on the skill repo** — Vercel can
+build it standalone. Skill upgrades are pulled via:
 
 ```bash
-git submodule add https://github.com/perseveringman/skills.git skill
-git commit -m "add skill submodule"
+bash <skill>/scripts/init_trips_repo.sh ~/Trips --upgrade
 ```
 
-Then `vercel.json` (in trips repo root):
+which re-copies `web/ scripts/ assets/ references/ vercel.json` but
+**leaves `trips/`, `.workbuddy/`, `.git/` untouched**.
 
-```json
-{
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "cd skill/travel-companion/web && npm install && TRIPS_DIR=$(pwd)/../../../trips npm run build && cp -R dist ../../../../dist",
-  "outputDirectory": "dist",
-  "framework": null,
-  "cleanUrls": true,
-  "rewrites": [
-    { "source": "/((?!trips/|assets/|favicon).*)", "destination": "/index.html" }
-  ]
-}
-```
+### Vercel one-time setup
 
-Skill upgrades happen via `git submodule update --remote skill && git push`.
+1. Push the trips repo to GitHub.
+2. https://vercel.com/new → Import that repo.
+3. **Framework Preset:** Other.
+4. **Root Directory:** leave empty.
+5. Build / Output: Vercel reads `vercel.json` directly:
+   - `buildCommand: cd web && npm install && TRIPS_DIR=../trips npm run build && rm -rf ../dist && cp -R dist ../dist`
+   - `outputDirectory: dist`
+6. **Production Branch:** `main`.
 
-### Option B — Skill in trips repo as a build-time clone
+After import, every `git push origin main` (driven by Track A's
+`scripts/publish.py`) triggers an auto redeploy. The site shows:
 
-Avoids the submodule, but the skill version is pinned to whatever your
-`buildCommand` clones. Use this only if you don't want submodules.
+- `/`              — Home (fetches `/trips/manifest.json`)
+- `/#/t/<slug>`    — Explorer (fetches `/trips/<slug>.json`)
 
-### Layout
+### Build flow on each push
 
-```
-~/Trips/                         (user's trips git repo)
-├── trips/
-│   └── <slug>/
-│       ├── .trip/meta.json
-│       ├── .trip/session-log.jsonl
-│       ├── wiki/entities/*.md
-│       ├── recommendations/{shots,food,itinerary,spots}/*.md
-│       └── data/trip.json
-├── skill/                       (git submodule → perseveringman/skills)
-│   └── travel-companion/web/    (built by Vercel)
-├── vercel.json
-├── .gitignore                   (ignores .workbuddy/)
-└── .workbuddy/active-trip       (per-cwd pointer; gitignored)
-```
-
-### Build flow (Vercel runs this on every push to trips repo)
-
-1. Vercel clones the trips repo (with submodules).
-2. `vercel.json#buildCommand` cd's into `skill/travel-companion/web/`
-   and runs `npm install && TRIPS_DIR=../../trips npm run build`.
+1. Vercel clones the trips repo.
+2. `vercel.json#buildCommand` runs: `cd web && npm install && TRIPS_DIR=../trips npm run build`.
 3. `vite build` invokes `tripsManifestPlugin`, which calls
-   `python3 scripts/build_trips_manifest.py --trips-dir ../../trips
+   `python3 ../scripts/build_trips_manifest.py --trips-dir ../trips
    --out-dir public/trips`.
-4. That script scans `trips/*/data/trip.json`, copies each into
-   `public/trips/<slug>.json`, and emits `public/trips/manifest.json`.
-5. Vite copies `public/` into `dist/`. Final layout:
-   - `/`                   — Home (fetches `/trips/manifest.json`)
-   - `/#/t/<slug>`         — Explorer (fetches `/trips/<slug>.json`)
-6. The build command copies `dist/` up to the trips repo root for Vercel.
+4. That scans `trips/*/data/trip.json`, copies each → `public/trips/<slug>.json`,
+   emits `public/trips/manifest.json`.
+5. Vite copies `public/` → `dist/`. Build command then promotes
+   `web/dist` to repo-root `dist/` so Vercel serves it.
 
 ### Track A response — when push fails
 
-`scripts/publish.py` returns a non-zero exit and includes
-`push_error: "..."` in its stdout JSON. Common reasons:
+`scripts/publish.py` returns non-zero with `push_error: "..."`. Common:
 
 - detached HEAD → checkout `main` and re-run.
 - non-fast-forward → `git pull --rebase origin main` and re-run.

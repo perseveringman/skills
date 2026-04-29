@@ -32,7 +32,9 @@ ln -s ~/Developer/skills/travel-companion ~/.workbuddy/skills/travel-companion
 ## Step 2 — 创建你的"旅行档案"目录
 
 旅行数据**不应该**写在 skill repo 里——它是你的私人内容，应该有自己的
-git repo。skill 自带一个一键初始化脚本：
+git repo。skill 自带一个一键初始化脚本，会把 explorer SPA + 所有
+helper 脚本 + Vercel 配置都一并拷进去，**生成一个完全 self-contained
+的 repo**：
 
 ```bash
 # 1. 在 GitHub 创建空 repo: github.com/<you>/trips（私有/公开都行）
@@ -54,9 +56,16 @@ git push -u origin main
 ~/Trips/
 ├── trips/
 │   └── egypt-south/        ← seed 数据（可删）
-├── .gitignore              (忽略 .workbuddy/ 等本地状态)
-└── README.md
+├── web/                    ← 完整 Vite SPA（Vercel 直接 build）
+├── scripts/                ← active_trip / publish / export_data / ...
+├── assets/  references/    ← SCHEMA + 抽实体 prompt
+├── vercel.json             ← 部署配置
+├── .gitignore  README.md  ONBOARDING.md
+└── (.workbuddy/ 是本地状态，被 gitignore)
 ```
+
+> 这个 repo **不依赖** skill repo 运行——Vercel 拿到它就能直接 build。
+> skill 升级时再用 `--upgrade` flag 刷一次工具部分（见 Step 4 末尾）。
 
 ---
 
@@ -103,56 +112,51 @@ agent 会调 `active_trip.py rename`，原子地改目录 + meta + 指针。
 
 ## Step 4 — 部署到 Vercel（可选，但强烈推荐）
 
-让你的 trips repo 自动变成可访问的网站。
+**好消息：你的 trips repo 已经是个完整的 Vite 项目了**，`init_trips_repo.sh`
+已经把 `web/`、`scripts/`、`vercel.json` 都拷进去了。所以 Vercel 直接
+import 即可，**没有 submodule、没有额外配置**。
 
 ### 一次性 Vercel setup
 
-1. 打开 https://vercel.com/new
-2. **Import** 你的 trips repo (`<you>/trips`)
-3. 设置：
+1. 在 GitHub 把你的 trips repo push 上去（`git push -u origin main`）
+2. 打开 https://vercel.com/new
+3. **Import** 你的 trips repo
+4. 设置：
    - **Framework Preset:** Other
    - **Root Directory:** 留空
-   - **Build Command:**
-     ```
-     npm install --prefix /tmp/skill-build https://github.com/perseveringman/skills.git#main && \
-     cd /tmp/skill-build/node_modules/perseveringman-skills/travel-companion/web && \
-     TRIPS_DIR="$VERCEL_PROJECT_PRODUCTION_URL_DIR/../trips" \
-     npm install && npm run build && \
-     cp -R dist "$VERCEL_PROJECT_PRODUCTION_URL_DIR/dist"
-     ```
-     > 上面是用 npm 的"远程包"语法把 skill repo 当依赖拉。如果你想要更
-     > 简单的方式，把 skill repo 作为 git submodule 引入 trips repo
-     > 即可（见下方"submodule 模式"）。
-   - **Output Directory:** `dist`
-4. 点 Deploy
+   - Build / Output / Install Command 都不用填，Vercel 会读 `vercel.json`
+5. 点 Deploy
 
-每次 `git push` 到 trips repo 的 main → Vercel 重 build → 网站
-更新。
+第一次 build ~1.5 分钟（要装 vite/react/leaflet/cytoscape）。之后每次
+agent 跑 `publish.py` 把 commit 推到 main → Vercel 自动 redeploy →
+~30 秒后你的 URL 就是最新的。
 
-### Submodule 模式（更简单）
+### 部署后的 URL 结构
+
+```
+https://<your-project>.vercel.app/             ← Home（trip 卡片网格）
+https://<your-project>.vercel.app/#/t/kyoto    ← 单 trip explorer
+https://<your-project>.vercel.app/trips/manifest.json     ← 数据 API
+https://<your-project>.vercel.app/trips/kyoto.json
+```
+
+### 升级 skill（拿到 UI / 脚本的新版本）
 
 ```bash
+# 假设 skill 还在 ~/Developer/skills/
+cd ~/Developer/skills && git pull
+
+# 把新版 web/ scripts/ assets/ references/ vercel.json 同步到你的 repo
+bash ~/Developer/skills/travel-companion/scripts/init_trips_repo.sh \
+     ~/Trips --upgrade
+
+# 提交
 cd ~/Trips
-git submodule add https://github.com/perseveringman/skills.git skill
-git submodule update --init --recursive
-git commit -m "add skill submodule"
-git push
+git diff --stat     # 看一眼改了什么
+git add -A && git commit -m "upgrade skill" && git push
 ```
 
-然后 vercel.json 用：
-
-```json
-{
-  "buildCommand": "cd skill/travel-companion/web && npm install && TRIPS_DIR=../../../trips npm run build && cp -R dist ../../../../dist",
-  "outputDirectory": "dist",
-  "framework": null,
-  "rewrites": [
-    { "source": "/((?!trips/|assets/|favicon).*)", "destination": "/index.html" }
-  ]
-}
-```
-
-skill 升级时：`git submodule update --remote skill && git push`。
+`--upgrade` **不会动** `trips/`、`.workbuddy/`、`.git/`——只刷工具部分。
 
 ---
 

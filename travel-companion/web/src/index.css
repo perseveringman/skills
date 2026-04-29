@@ -47,14 +47,19 @@ a:hover { text-decoration: underline; }
   height: 100%;
   width: 100%;
 }
-/* Mobile: timeline is between topbar and stage (no bottom row) */
+/* Mobile: flex column — stage takes all remaining space regardless of
+   whether Timeline renders or not. */
 @media (max-width: 768px) {
-  .app { grid-template-rows: auto auto 1fr; }
+  .app {
+    display: flex;
+    flex-direction: column;
+  }
 }
 .stage {
   position: relative;
   overflow: hidden;
   min-height: 0;
+  flex: 1;  /* flex child: fill remaining space (mobile) */
 }
 .layer {
   position: absolute; inset: 0;

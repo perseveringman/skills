@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { TripStore } from "../store";
 import type { TripEvent } from "../lib/types";
 
@@ -10,6 +10,11 @@ export default function Timeline({ useStore, isMobile }:
   const open = useStore((s) => s.timelineOpen);
   const setOpen = useStore((s) => s.setTimelineOpen);
   const [tall, setTall] = useState(false);
+
+  // Auto-open timeline on mobile so it's immediately visible
+  useEffect(() => {
+    if (isMobile && events.length > 0) setOpen(true);
+  }, [isMobile]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const withYear = useMemo(
     () => events.filter((e): e is TripEvent & { year: number } =>

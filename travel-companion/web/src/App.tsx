@@ -41,6 +41,9 @@ export default function App({ useStore }: Props) {
     <div className={`app ${isMobile ? "mobile" : "desktop"}`}>
       <Topbar useStore={useStore} isMobile={isMobile} />
 
+      {/* Mobile: timeline above stage so bottom drawer won't cover it */}
+      {isMobile && <Timeline useStore={useStore} isMobile={isMobile} />}
+
       <div className="stage">
         {/* On desktop both layers coexist. On mobile we switch with a tab bar. */}
         {(!isMobile || activeTab === "map") && (
@@ -56,7 +59,8 @@ export default function App({ useStore }: Props) {
         {isMobile && <MobileTabs useStore={useStore} />}
       </div>
 
-      <Timeline useStore={useStore} isMobile={isMobile} />
+      {/* Desktop: timeline below stage */}
+      {!isMobile && <Timeline useStore={useStore} isMobile={isMobile} />}
       <DetailDrawer useStore={useStore} isMobile={isMobile} />
       {!isMobile && <Legend useStore={useStore} />}
     </div>
